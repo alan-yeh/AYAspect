@@ -1,0 +1,11 @@
+use_frameworks!
+
+target 'AYAspect_Example' do
+  pod 'AYAspect', :path => '../'
+
+  target 'AYAspect_Tests' do
+    inherit! :search_paths
+
+    
+  end
+end

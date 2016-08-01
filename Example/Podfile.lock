@@ -1,0 +1,16 @@
+PODS:
+  - AYAspect (0.1.0)
+
+DEPENDENCIES:
+  - AYAspect (from `../`)
+
+EXTERNAL SOURCES:
+  AYAspect:
+    :path: "../"
+
+SPEC CHECKSUMS:
+  AYAspect: fa2a0fd410216b506d7919288caf1903c24362e1
+
+PODFILE CHECKSUM: 2d3c112df02f87f3be4d782aa03ce5a96b58d4e5
+
+COCOAPODS: 1.0.1
