@@ -8,15 +8,15 @@
 
 #import <Foundation/Foundation.h>
 
-@class PSInvocationDetails;
+@class AYInvocationDetails;
 @protocol AYInterceptor;
 
-extern BOOL _ps_aspect_is_show_log;/**< whether show logs */
+extern BOOL _ay_aspect_is_show_log;/**< whether show logs */
 
-@interface PSInvocation : NSInvocation
+@interface AYInvocation : NSInvocation
 @end
 
-@interface PSInvocationDetails : NSObject
+@interface AYInvocationDetails : NSObject
 @property (nonatomic, assign) SEL proxy_selector;/**< original selector */
 @property (nonatomic, copy) NSArray<id<AYInterceptor>> *interceptors;/**< interceptors to execute */
 @property (nonatomic, assign) NSInteger index;/**< index of executing interceptor */
@@ -24,11 +24,11 @@ extern BOOL _ps_aspect_is_show_log;/**< whether show logs */
 + (instancetype)detailsWithProxySelector:(SEL)aSelector interceptors:(NSArray<id<AYInterceptor>> *)interceptors;
 @end
 
-@interface NSObject (PS_INVOCATION_TARGET_INTERCEPTORS)
-- (void)_ps_set_details:(PSInvocationDetails *)details for_invocation:(NSInvocation *)invocation;
-- (PSInvocationDetails *)_ps_details_for_invocation:(NSInvocation *)invocation;
+@interface NSObject (AY_INVOCATION_TARGET_INTERCEPTORS)
+- (void)_ay_set_details:(AYInvocationDetails *)details for_invocation:(NSInvocation *)invocation;
+- (AYInvocationDetails *)_ay_details_for_invocation:(NSInvocation *)invocation;
 
 #pragma mark - for interceptor
-- (Class)_ps_aspect_target;
-- (void)_ps_set_aspect_target:(Class)target;
+- (Class)_ay_aspect_target;
+- (void)_ay_set_aspect_target:(Class)target;
 @end

@@ -15,7 +15,7 @@
  *
  *  @param invocation 被拦截的方法
  *  Note: 1.如果需要执行原来的方法，需要调用[invocation invoke]，否则被拦截的方法不执行
- *        2.PSAspect将会持有拦截器的实例
+ *        2.AYAspect将会持有拦截器的实例
  *
  *  已知BUG: 当同时拦截父类与子类的同一个方法时, 父类被拦载的方法将无法再被调用
  *  如果真的需要同时拦截父类与子类同一个方法, 建议在父类直接使用method swizzling进行拦截
@@ -23,14 +23,14 @@
 - (void)intercept:(NSInvocation *)invocation;
 @end
 
-id<AYInterceptor> interceptor(void (^block)(NSInvocation *invocation));
+FOUNDATION_EXPORT id<AYInterceptor> AYInterceptorMake(void (^block)(NSInvocation *invocation));
 
 /**
- *  PSAspect
+ *  AYAspect
  *  ========================================================
  *
  */
-@interface PSAspect : NSObject
+@interface AYAspect : NSObject
 + (void)showLog:(BOOL)isShow;/**< 是否打印调试信息 */
 @end
 
@@ -38,7 +38,7 @@ id<AYInterceptor> interceptor(void (^block)(NSInvocation *invocation));
  *  对所有类的实例进行增强
  *  注意：同时会影响其继承体系
  */
-@interface PSAspect (Class)
+@interface AYAspect (Class)
 /**
  *  使用Interceptor拦截实例方法
  *
@@ -58,14 +58,14 @@ id<AYInterceptor> interceptor(void (^block)(NSInvocation *invocation));
 /**
  *  对单个实例进行增强，不会影响其继承体系
  */
-@interface PSAspect(Instance)
+@interface AYAspect(Instance)
 /**
  *  为一个实例的某个方法添加拦截器
  */
 + (void)interceptSelector:(SEL)aSelector inInstance:(id)aInstance withInterceptor:(id<AYInterceptor>)aInterceptor;
 @end
 
-@interface NSObject (PSAspect)
-+ (void)ps_interceptSelector:(SEL)aSelector withInterceptor:(id<AYInterceptor>)aInterceptor;
-- (void)ps_interceptSelector:(SEL)aSelector withInterceptor:(id<AYInterceptor>)aInterceptor;
+@interface NSObject (AYAspect)
++ (void)ay_interceptSelector:(SEL)aSelector withInterceptor:(id<AYInterceptor>)aInterceptor;
+- (void)ay_interceptSelector:(SEL)aSelector withInterceptor:(id<AYInterceptor>)aInterceptor;
 @end

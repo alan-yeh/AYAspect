@@ -8,7 +8,7 @@
 
 Pod::Spec.new do |s|
   s.name             = 'AYAspect'
-  s.version          = '0.1.0'
+  s.version          = '1.0.0'
   s.summary          = 'AOP'
 
   s.homepage         = 'https://github.com/alan-yeh/AYAspect'
@@ -20,4 +20,5 @@ Pod::Spec.new do |s|
 
   s.source_files = 'AYAspect/Classes/**/*'
   s.public_header_files = 'AYAspect/Classes/AYAspect.h'
+  s.dependency 'AYRuntime'
 end

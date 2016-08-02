@@ -10,104 +10,71 @@
 #import "AYInvocation.h"
 #import <objc/runtime.h>
 #import <objc/message.h>
+#import <AYRuntime/runtime.h>
 
-#define ProxySelector(class, selector) NSSelectorFromString([NSString stringWithFormat:@"__ps_proxy_%@_%@", NSStringFromClass(class), NSStringFromSelector(selector)])
-
-#define PSAssociatedKey(key)  static void *key = &key
-#define PSAssociatedKeyAndNotes(key, notes) static void *key = &key
-
-Method ps_class_getInstanceMethod(Class cls, SEL sel){
-    Method result = nil;
-    unsigned int mcount;
-    Method *mlist = class_copyMethodList(cls, &mcount);
-    for (int i = 0; i < mcount; i ++) {
-        if (method_getName(mlist[i]) == sel) {
-            result = mlist[i];
-        }
-    }
-    free(mlist);
-    return result;
-}
+#define ProxySelector(class, selector) NSSelectorFromString([NSString stringWithFormat:@"__ay_proxy_%@_%@", NSStringFromClass(class), NSStringFromSelector(selector)])
 
 
-Method ps_class_getMethod(Class cls, SEL sel){
-    Method result = nil;
-    unsigned int mcount;
-    Method *mlist = class_copyMethodList(object_getClass((id)cls), &mcount);
-    for (int i = 0; i < mcount; i ++) {
-        if (method_getName(mlist[i]) == sel) {
-            result = mlist[i];
-        }
-    }
-    free(mlist);
-    return result;
-}
-
-@interface NSObject (PSAspect_Associated_Info)
+@interface NSObject (AYAspect_Associated_Info)
 #pragma mark - instance interceptors
-- (NSMutableDictionary<NSString *, NSMutableArray<id<AYInterceptor>> *> *)_ps_aspect_map; /**< cache instance selector-interceptor */
-- (NSArray<id<AYInterceptor>> *)_ps_interceptors_for_selector:(SEL)aSelector; /**< get interceptors for selector in instance. */
+- (NSMutableDictionary<NSString *, NSMutableArray<id<AYInterceptor>> *> *)_ay_aspect_map; /**< cache instance selector-interceptor */
+- (NSArray<id<AYInterceptor>> *)_ay_interceptors_for_selector:(SEL)aSelector; /**< get interceptors for selector in instance. */
 
 #pragma mark - class interceptors
-+ (NSMutableArray<id<AYInterceptor>> *)_ps_interceptors_for_selector:(SEL)aSelector; /**< get interceptors for selector in class*/
-+ (void)_ps_clear_all_interceptors; /**< remove all interceptors in class */
++ (NSMutableArray<id<AYInterceptor>> *)_ay_interceptors_for_selector:(SEL)aSelector; /**< get interceptors for selector in class*/
++ (void)_ay_clear_all_interceptors; /**< remove all interceptors in class */
 
 #pragma mark - utils
-+ (NSMutableSet<NSString *> *)_ps_aspected_selectors;/**< store the method names which were aspected. */
++ (NSMutableSet<NSString *> *)_ay_aspected_selectors;/**< store the method names which were aspected. */
 @end
 
-#pragma mark - PSAspect
-@implementation PSAspect
+#pragma mark - AYAspect
+@implementation AYAspect
 + (void)showLog:(BOOL)isShow{
-    _ps_aspect_is_show_log = YES;
+    _ay_aspect_is_show_log = YES;
 }
 @end
 
-@implementation PSAspect (Priviate)
-+ (NSMutableSet<Class> *)_aspected_classes{
-    PSAssociatedKeyAndNotes(PS_ASPECTED_CLASSES, "Store the aspected classes");
-    return objc_getAssociatedObject(self, PS_ASPECTED_CLASSES) ?: ({id value = [NSMutableSet new]; objc_setAssociatedObject(self, PS_ASPECTED_CLASSES, value, OBJC_ASSOCIATION_RETAIN_NONATOMIC); value;});
+@implementation AYAspect (Priviate)
++ (NSMutableSet<Class> *)aspected_classes{
+    objc_AssociationKeyAndNotes(AY_ASPECTED_CLASSES, "Store the aspected classes");
+    return objc_getAssociatedDefaultObject(self, AY_ASPECTED_CLASSES, [NSMutableSet new], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
-+ (NSSet<NSString *> *)_unaspectable_selectors{
-    static NSSet<NSString *> *unaspectableSelectors = nil;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        unaspectableSelectors = [NSSet setWithObjects:@"retain", @"release", @"autorelease", @"dealloc", @"forwardInvocation:", @"forwardingTargetForSelector", nil];
-    });
-    return unaspectableSelectors;
++ (NSSet<NSString *> *)unaspectable_selectors{
+    return [NSSet setWithObjects:@"retain", @"release", @"autorelease", @"dealloc", @"forwardInvocation:", @"forwardingTargetForSelector", nil];
 }
 
-+ (void)_check_if_aspectable_selector:(SEL)aSelector in_class:(Class)aClass{
-    NSAssert(![[self _unaspectable_selectors] containsObject:NSStringFromSelector(aSelector)], @"PSAspect can not complete: Selector: %@ is not allowed to aspect.", NSStringFromSelector(aSelector));
++ (void)check_if_aspectable_selector:(SEL)aSelector in_class:(Class)aClass{
+    NSAssert(![[self unaspectable_selectors] containsObject:NSStringFromSelector(aSelector)], @"AYAspect can not complete: Selector: %@ is not allowed to aspect.", NSStringFromSelector(aSelector));
     
-    for (Class cls in [self _aspected_classes]) {
-        if ([[cls _ps_aspected_selectors] containsObject:NSStringFromSelector(aSelector)]) {
-            NSAssert(!([cls class] != aClass && [cls isSubclassOfClass:aClass]), @"PSAspect can not complete: The subclass<%@> of <%@> has aspect the selector: %@, aspect same selector in inheritance may cause bugs.", NSStringFromClass(cls), NSStringFromClass(aClass), NSStringFromSelector(aSelector));
+    for (Class cls in [self aspected_classes]) {
+        if ([[cls _ay_aspected_selectors] containsObject:NSStringFromSelector(aSelector)]) {
+            NSAssert(!([cls class] != aClass && [cls isSubclassOfClass:aClass]), @"AYAspect can not complete: The subclass<%@> of <%@> has aspect the selector: %@, aspect same selector in inheritance may cause bugs.", NSStringFromClass(cls), NSStringFromClass(aClass), NSStringFromSelector(aSelector));
             
         
-            NSAssert(!([aClass class] != cls && [aClass isSubclassOfClass:cls]), @"PSAspect can not complete: The superclass<%@> of <%@> has aspect the selector: %@, aspect same selector in inheritance may cause bugs.", NSStringFromClass(cls), NSStringFromClass(aClass), NSStringFromSelector(aSelector));
+            NSAssert(!([aClass class] != cls && [aClass isSubclassOfClass:cls]), @"AYAspect can not complete: The superclass<%@> of <%@> has aspect the selector: %@, aspect same selector in inheritance may cause bugs.", NSStringFromClass(cls), NSStringFromClass(aClass), NSStringFromSelector(aSelector));
         }
     }
 }
 
 /** make a proxy selector instead origin selector. */
-+ (void)_proxy_selector:(SEL)aSelector in_class:(Class)aClass{
++ (void)proxy_selector:(SEL)aSelector in_class:(Class)aClass{
     // check if there is any aspected selector in superclass/subclass
-    [self _check_if_aspectable_selector:aSelector in_class:aClass];
+    [self check_if_aspectable_selector:aSelector in_class:aClass];
     
-    [self _aspect_class:aClass];
+    [self aspect_class:aClass];
     
-    if ([[aClass _ps_aspected_selectors] containsObject:NSStringFromSelector(aSelector)]) {
+    if ([[aClass _ay_aspected_selectors] containsObject:NSStringFromSelector(aSelector)]) {
         return;
     }
-    [[aClass _ps_aspected_selectors] addObject:NSStringFromSelector(aSelector)];
+    [[aClass _ay_aspected_selectors] addObject:NSStringFromSelector(aSelector)];
     
     // find method from target class
     Method originalMethod = class_getInstanceMethod(aClass, aSelector);
     
     // copy method into target class if method is implement in superclass
-    if (ps_class_getInstanceMethod(aClass, aSelector) == nil) {
+    if (class_getInstanceMethod(aClass, aSelector) == nil) {
         class_addMethod(aClass, aSelector, method_getImplementation(originalMethod), method_getTypeEncoding(originalMethod));
         originalMethod = class_getInstanceMethod(aClass, aSelector);
     }
@@ -133,15 +100,15 @@ Method ps_class_getMethod(Class cls, SEL sel){
 }
 
 /** add method [-forwardingTargetForSelector:] and [-forwardInvocation:] to the class. */
-+ (void)_aspect_class:(Class)aClass{
-    if ([[self _aspected_classes] containsObject:aClass]) {
++ (void)aspect_class:(Class)aClass{
+    if ([[self aspected_classes] containsObject:aClass]) {
         return;
     }
-    [[self _aspected_classes] addObject:aClass];
+    [[self aspected_classes] addObject:aClass];
     
     //add forwardingTargetForSelector: implementation
     IMP forwardingIMP = imp_implementationWithBlock(^id(id target, SEL selector){
-        if ([[aClass _ps_aspected_selectors] containsObject:NSStringFromSelector(selector)]) {
+        if ([[aClass _ay_aspected_selectors] containsObject:NSStringFromSelector(selector)]) {
             return target;
         }else{
             SEL proxyForwardingSel = ProxySelector(aClass, @selector(forwardingTargetForSelector:));
@@ -160,13 +127,13 @@ Method ps_class_getMethod(Class cls, SEL sel){
     
     //add forwardInvocation: implementation
     IMP forwardIMP = imp_implementationWithBlock(^(id target, NSInvocation *anInvocation){
-        if ([[aClass _ps_aspected_selectors] containsObject:NSStringFromSelector(anInvocation.selector)]) {
-            NSArray<id<AYInterceptor>> *interceptors = [PSAspect _interceptors_for_invocation:anInvocation search_from:aClass];
-            object_setClass(anInvocation, [PSInvocation class]);
+        if ([[aClass _ay_aspected_selectors] containsObject:NSStringFromSelector(anInvocation.selector)]) {
+            NSArray<id<AYInterceptor>> *interceptors = [AYAspect interceptors_for_invocation:anInvocation search_from:aClass];
+            object_setClass(anInvocation, [AYInvocation class]);
             
             SEL proxySelector = ProxySelector(aClass, anInvocation.selector);
-            PSInvocationDetails *details = [PSInvocationDetails detailsWithProxySelector:proxySelector interceptors:interceptors];
-            [anInvocation.target _ps_set_details:details for_invocation:anInvocation];
+            AYInvocationDetails *details = [AYInvocationDetails detailsWithProxySelector:proxySelector interceptors:interceptors];
+            [anInvocation.target _ay_set_details:details for_invocation:anInvocation];
             
             [anInvocation invoke];
         }else{
@@ -186,9 +153,9 @@ Method ps_class_getMethod(Class cls, SEL sel){
 }
 
 /** get interceptors for invocation. */
-+ (NSArray<id<AYInterceptor>> *)_interceptors_for_invocation:(NSInvocation *)invocation search_from:(Class)aClass{
-    NSArray<id<AYInterceptor>> *classInterceptors = [aClass _ps_interceptors_for_selector:invocation.selector];
-    NSArray<id<AYInterceptor>> *instanceInterceptors = [invocation.target _ps_interceptors_for_selector:invocation.selector];
++ (NSArray<id<AYInterceptor>> *)interceptors_for_invocation:(NSInvocation *)invocation search_from:(Class)aClass{
+    NSArray<id<AYInterceptor>> *classInterceptors = [aClass _ay_interceptors_for_selector:invocation.selector];
+    NSArray<id<AYInterceptor>> *instanceInterceptors = [invocation.target _ay_interceptors_for_selector:invocation.selector];
     
     NSMutableArray *result = [NSMutableArray new];
     
@@ -204,40 +171,40 @@ Method ps_class_getMethod(Class cls, SEL sel){
 
 @end
 
-@implementation PSAspect (Class)
+@implementation AYAspect (Class)
 + (void)interceptSelector:(SEL)aSelector inClass:(Class)aClass withInterceptor:(id<AYInterceptor>)aInterceptor{
     NSParameterAssert(aSelector);
     NSParameterAssert(aClass);
     NSParameterAssert(aInterceptor);
-    NSAssert([aClass instancesRespondToSelector:aSelector], @"PSAspect can not complete: Instance of <%@> does not respond to selector:%@", NSStringFromClass(aClass), NSStringFromSelector(aSelector));
+    NSAssert([aClass instancesRespondToSelector:aSelector], @"AYAspect can not complete: Instance of <%@> does not respond to selector:%@", NSStringFromClass(aClass), NSStringFromSelector(aSelector));
     
-    [self _proxy_selector:aSelector in_class:aClass];
+    [self proxy_selector:aSelector in_class:aClass];
     
-    [(id)aInterceptor _ps_set_aspect_target:aClass];
-    [[aClass _ps_interceptors_for_selector:aSelector] addObject:aInterceptor];
+    [(id)aInterceptor _ay_set_aspect_target:aClass];
+    [[aClass _ay_interceptors_for_selector:aSelector] addObject:aInterceptor];
 }
 
 + (void)clearInterceptorsForClass:(Class)aClass{
-    [aClass _ps_clear_all_interceptors];
+    [aClass _ay_clear_all_interceptors];
 }
 
 + (void)clearInterceptsForSelector:(SEL)aSelector inClass:(Class)aClass{
-    [[aClass _ps_interceptors_for_selector:aSelector] removeAllObjects];
+    [[aClass _ay_interceptors_for_selector:aSelector] removeAllObjects];
 }
 @end
 
 
-@implementation PSAspect (Instance)
+@implementation AYAspect (Instance)
 + (void)interceptSelector:(SEL)aSelector inInstance:(id)aInstance withInterceptor:(id<AYInterceptor>)aInterceptor{
-    NSParameterAssert(aSelector);
+    NSParameterAssert(aSelector != NULL);
     NSParameterAssert(aInterceptor);
     NSParameterAssert(aInterceptor);
-    NSAssert([aInstance respondsToSelector:aSelector], @"PSAspect can not complete: Instance:<%@ %p> does not respond to selector:%@",NSStringFromClass(aInterceptor.class), aInstance, NSStringFromSelector(aSelector));
+    NSAssert([aInstance respondsToSelector:aSelector], @"AYAspect can not complete: Instance:<%@ %p> does not respond to selector:%@",NSStringFromClass(aInterceptor.class), aInstance, NSStringFromSelector(aSelector));
     
-    [self _proxy_selector:aSelector in_class:[aInstance class]];
+    [self proxy_selector:aSelector in_class:[aInstance class]];
     
-    [(id)aInterceptor _ps_set_aspect_target:[aInstance class]];
-    NSMutableDictionary<NSString *,NSMutableArray<id<AYInterceptor>> *> *dic = [aInstance _ps_aspect_map];
+    [(id)aInterceptor _ay_set_aspect_target:[aInstance class]];
+    NSMutableDictionary<NSString *,NSMutableArray<id<AYInterceptor>> *> *dic = [aInstance _ay_aspect_map];
     
     NSMutableArray<id<AYInterceptor>> *interceptors = dic[NSStringFromSelector(aSelector)];
     if (interceptors == nil) {
@@ -248,24 +215,23 @@ Method ps_class_getMethod(Class cls, SEL sel){
 }
 @end
 
-#pragma mark - PSAspect Associated Info
-@implementation NSObject (PSAspect_Associated_Info)
+#pragma mark - AYAspect Associated Info
+@implementation NSObject (AYAspect_Associated_Info)
 #pragma mark - instance interceptors
-- (NSMutableDictionary<NSString *,NSMutableArray<id<AYInterceptor>> *> *)_ps_aspect_map{
-    PSAssociatedKeyAndNotes(OBJECT_ASPECT_MAP_KEY, "Store Selector-Interceptors Map");
-    
-    return objc_getAssociatedObject(self, OBJECT_ASPECT_MAP_KEY) ?: ({id value = [NSMutableDictionary new]; objc_setAssociatedObject(self, OBJECT_ASPECT_MAP_KEY, value, OBJC_ASSOCIATION_RETAIN_NONATOMIC); value;});
+- (NSMutableDictionary<NSString *,NSMutableArray<id<AYInterceptor>> *> *)_ay_aspect_map{
+    objc_AssociationKeyAndNotes(OBJECT_ASPECT_MAP_KEY, "Store Selector-Interceptors Map");
+    return objc_getAssociatedDefaultObject(self, OBJECT_ASPECT_MAP_KEY, [NSMutableDictionary new], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
-- (NSArray<id<AYInterceptor>> *)_ps_interceptors_for_selector:(SEL)aSelector{
-    return [[self _ps_aspect_map] objectForKey:NSStringFromSelector(aSelector)];
+- (NSArray<id<AYInterceptor>> *)_ay_interceptors_for_selector:(SEL)aSelector{
+    return [[self _ay_aspect_map] objectForKey:NSStringFromSelector(aSelector)];
 }
 
 #pragma mark - class interceptors
-PSAssociatedKeyAndNotes(PS_INTERCEPTORS_FOR_SELECTOR_IN_OWN, "Store Interceptors for selector");
-+ (NSMutableArray<id<AYInterceptor>> *)_ps_interceptors_for_selector:(SEL)aSelector{
+objc_AssociationKeyAndNotes(AY_INTERCEPTORS_FOR_SELECTOR_IN_OWN, "Store Interceptors for selector");
++ (NSMutableArray<id<AYInterceptor>> *)_ay_interceptors_for_selector:(SEL)aSelector{
     
-    NSMutableDictionary<NSString *, NSMutableArray<id<AYInterceptor>> *> *dic = objc_getAssociatedObject(self, PS_INTERCEPTORS_FOR_SELECTOR_IN_OWN) ?: ({id value = [NSMutableDictionary new]; objc_setAssociatedObject(self, PS_INTERCEPTORS_FOR_SELECTOR_IN_OWN, value, OBJC_ASSOCIATION_RETAIN_NONATOMIC); value;});
+    NSMutableDictionary<NSString *, NSMutableArray<id<AYInterceptor>> *> *dic = objc_getAssociatedDefaultObject(self, AY_INTERCEPTORS_FOR_SELECTOR_IN_OWN, [NSMutableDictionary new], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     
     NSMutableArray<id<AYInterceptor>> *array = dic[NSStringFromSelector(aSelector)];
     if (array == nil) {
@@ -275,41 +241,35 @@ PSAssociatedKeyAndNotes(PS_INTERCEPTORS_FOR_SELECTOR_IN_OWN, "Store Interceptors
     return array;
 }
 
-+ (void)_ps_clear_all_interceptors{
-    objc_setAssociatedObject(self, PS_INTERCEPTORS_FOR_SELECTOR_IN_OWN, [NSMutableDictionary new], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
++ (void)_ay_clear_all_interceptors{
+    objc_setAssociatedObject(self, AY_INTERCEPTORS_FOR_SELECTOR_IN_OWN, [NSMutableDictionary new], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
-#pragma mark - utils implementation
-+ (NSMutableSet<NSString *> *)_ps_aspected_selectors{
-    PSAssociatedKeyAndNotes(PS_ASPECTED_SELECTOR_KEY, "Store selectors that aspected");
-    NSMutableSet *set = objc_getAssociatedObject(self, PS_ASPECTED_SELECTOR_KEY);
-    if (set == nil) {
-        set = [NSMutableSet new];
-        objc_setAssociatedObject(self, PS_ASPECTED_SELECTOR_KEY, set, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    }
-    return set;
++ (NSMutableSet<NSString *> *)_ay_aspected_selectors{
+    objc_AssociationKeyAndNotes(AY_ASPECTED_SELECTOR_KEY, "Store selectors that aspected");
+    return objc_getAssociatedDefaultObject(self, AY_ASPECTED_SELECTOR_KEY, [NSMutableSet new], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 @end
 
-@implementation NSObject (PSAspect)
-- (void)ps_interceptSelector:(SEL)aSelector withInterceptor:(id<AYInterceptor>)aInterceptor{
-    [PSAspect interceptSelector:aSelector inInstance:self withInterceptor:aInterceptor];
+@implementation NSObject (AYAspect)
+- (void)ay_interceptSelector:(SEL)aSelector withInterceptor:(id<AYInterceptor>)aInterceptor{
+    [AYAspect interceptSelector:aSelector inInstance:self withInterceptor:aInterceptor];
 }
 
-+ (void)ps_interceptSelector:(SEL)aSelector withInterceptor:(id<AYInterceptor>)aInterceptor{
-    [PSAspect interceptSelector:aSelector inClass:[self class] withInterceptor:aInterceptor];
++ (void)ay_interceptSelector:(SEL)aSelector withInterceptor:(id<AYInterceptor>)aInterceptor{
+    [AYAspect interceptSelector:aSelector inClass:[self class] withInterceptor:aInterceptor];
 }
 @end
 
-#pragma mark - PSBlockInterceptor
-@interface PSBlockInterceptor : NSObject<AYInterceptor>
+#pragma mark - AYBlockInterceptor
+@interface _AYBlockInterceptor : NSObject<AYInterceptor>
 @property (nonatomic, copy) void (^interceptor)(NSInvocation *invocation);
 + (instancetype)interceptorWithBlock:(void (^)(NSInvocation *invocation))block;
 @end
 
-@implementation PSBlockInterceptor
+@implementation _AYBlockInterceptor
 + (instancetype)interceptorWithBlock:(void (^)(NSInvocation *))block{
-    PSBlockInterceptor *instance = [self new];
+    _AYBlockInterceptor *instance = [self new];
     instance.interceptor = block;
     return instance;
 }
@@ -320,6 +280,6 @@ PSAssociatedKeyAndNotes(PS_INTERCEPTORS_FOR_SELECTOR_IN_OWN, "Store Interceptors
 }
 @end
 
-id<AYInterceptor> interceptor(void (^block)(NSInvocation *invocation)){
-    return [PSBlockInterceptor interceptorWithBlock:block];
+id<AYInterceptor> AYInterceptorMake(void (^block)(NSInvocation *invocation)){
+    return [_AYBlockInterceptor interceptorWithBlock:block];
 }
