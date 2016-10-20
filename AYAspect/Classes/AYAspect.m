@@ -10,7 +10,7 @@
 #import "AYInvocation.h"
 #import <objc/runtime.h>
 #import <objc/message.h>
-#import <AYRuntime/runtime.h>
+#import <AYRuntime/AYRuntime.h>
 
 #define ProxySelector(class, selector) NSSelectorFromString([NSString stringWithFormat:@"__ay_proxy_%@_%@", NSStringFromClass(class), NSStringFromSelector(selector)])
 

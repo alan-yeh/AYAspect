@@ -1,19 +1,19 @@
 PODS:
-  - AYAspect (1.0.0):
+  - AYAspect (1.0.1):
     - AYRuntime
-  - AYRuntime (1.0.1)
+  - AYRuntime (1.0.3)
 
 DEPENDENCIES:
   - AYAspect (from `../`)
 
 EXTERNAL SOURCES:
   AYAspect:
-    :path: ../
+    :path: "../"
 
 SPEC CHECKSUMS:
-  AYAspect: 7530804259d1256ebb38305c05220447c4702fdf
-  AYRuntime: c738c601ee1cc553601def6dda83e640ea0fd465
+  AYAspect: a1f7001b9096afb8220f51be2279070424715c9e
+  AYRuntime: 74cf85d7ed40d036b13837057d5811864c11024e
 
 PODFILE CHECKSUM: 2d3c112df02f87f3be4d782aa03ce5a96b58d4e5
 
-COCOAPODS: 1.0.0
+COCOAPODS: 1.1.0.beta.2
