@@ -7,7 +7,7 @@
 //
 
 #import "AYAspect.h"
-#import "AYInvocation.h"
+#import "AYInvocationProxy.h"
 #import <objc/runtime.h>
 #import <objc/message.h>
 #import <AYRuntime/AYRuntime.h>
@@ -129,13 +129,9 @@
     IMP forwardIMP = imp_implementationWithBlock(^(id target, NSInvocation *anInvocation){
         if ([[aClass _ay_aspected_selectors] containsObject:NSStringFromSelector(anInvocation.selector)]) {
             NSArray<id<AYInterceptor>> *interceptors = [AYAspect interceptors_for_invocation:anInvocation search_from:aClass];
-            object_setClass(anInvocation, [AYInvocation class]);
-            
-            SEL proxySelector = ProxySelector(aClass, anInvocation.selector);
-            AYInvocationDetails *details = [AYInvocationDetails detailsWithProxySelector:proxySelector interceptors:interceptors];
-            [anInvocation.target _ay_set_details:details for_invocation:anInvocation];
-            
-            [anInvocation invoke];
+            AYInvocationProxy *proxy = [[AYInvocationProxy alloc] initWithInvocation:anInvocation andInterceptors:interceptors];
+            [anInvocation setSelector:ProxySelector(aClass, anInvocation.selector)];
+            [proxy invoke];
         }else{
             SEL proxyForwardingSel = ProxySelector(aClass, @selector(forwardInvocation:));
             if ([aClass instancesRespondToSelector:proxyForwardingSel]) {

@@ -7,8 +7,21 @@
 //
 
 #import "AYViewController.h"
+#import <AYAspect/AYAspect.h>
 
 @interface AYViewController ()
+
+@end
+
+@interface Test : NSObject
+- (void)btnAction;
+@end
+
+@implementation Test
+
+- (void)btnAction{
+    NSLog(@"haha");
+}
 
 @end
 
@@ -18,12 +31,22 @@
 {
     [super viewDidLoad];
 	// Do any additional setup after loading the view, typically from a nib.
+    [AYAspect showLog:YES];
+    
+    [AYAspect interceptSelector:@selector(btnAction:) inClass:AYViewController.class withInterceptor:AYInterceptorMake(^(NSInvocation *invocation) {
+        NSLog(@"invoke1: %@", invocation.target);
+        
+        NSInteger idx = 5;
+        [invocation setArgument:&idx atIndex:2];
+        [invocation invoke];
+        NSLog(@"invoke2");
+    })];
+    
+    [self btnAction: 2];
 }
 
-- (void)didReceiveMemoryWarning
-{
-    [super didReceiveMemoryWarning];
-    // Dispose of any resources that can be recreated.
+- (void)btnAction:(NSInteger)idx {
+    NSLog(@"idx= %@", @(idx));
 }
 
 @end
